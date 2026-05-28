@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoring Realisasi Kedatangan</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06080f;
+  --surface: #0d1117;
+  --surface2: #131a24;
+  --surface3: #1a2332;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --green: #00e5a0;
+  --blue: #3b9eff;
+  --amber: #ffb23f;
+  --red: #ff5757;
+  --purple: #b97fff;
+  --cyan: #00d4ff;
+  --text: #e8edf5;
+  --text2: #7b8fa8;
+  --text3: #3d4f64;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* NOISE TEXTURE */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0;
+}
+
+.wrap { position: relative; z-index: 1; padding: 20px; max-width: 1440px; margin: 0 auto; }
+
+/* HEADER */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  position: relative; overflow: hidden;
+}
+.header::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--blue), var(--green), transparent);
+}
+.header-brand { display: flex; align-items: center; gap: 12px; }
+.header-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: linear-gradient(135deg, #1a6cff, #00c896);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.header-title { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+.header-sub { font-size: 10px; color: var(--text3); font-family: 'DM Mono'; margin-top: 2px; }
+.live-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; padding: 4px 10px; border-radius: 20px;
+  background: rgba(0,229,160,0.1); color: var(--green);
+  border: 1px solid rgba(0,229,160,0.2); font-family: 'DM Mono';
+}
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 1.4s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* FILTER BAR */
+.filter-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.filter-top {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+}
+.filter-group { display: flex; flex-direction: column; gap: 5px; position: relative; }
+.filter-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text3);
+}
+
+/* CHECKBOX DROPDOWN TRIGGER */
+.cb-trigger {
+  font-family: 'DM Mono'; font-size: 11px;
+  padding: 8px 36px 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background: var(--surface3);
+  color: var(--text); cursor: pointer;
+  min-width: 200px; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  user-select: none;
+  position: relative;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  white-space: nowrap; overflow: hidden;
+}
+.cb-trigger:hover { border-color: var(--border2); }
+.cb-trigger.open { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,158,255,0.12); }
+.cb-trigger-text { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.cb-trigger-count {
+  flex-shrink: 0;
+  background: var(--blue); color: #000; font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 10px; display: none;
+}
+.cb-trigger-count.show { display: inline-block; }
+.cb-arrow {
+  flex-shrink: 0; font-size: 8px; color: var(--text3);
+  transition: transform 0.2s;
+}
+.cb-trigger.open .cb-arrow { transform: rotate(180deg); }
+
+/* DROPDOWN PANEL */
+.cb-panel {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  min-width: 220px; z-index: 999;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+  overflow: hidden;
+  display: none;
+  animation: dropIn 0.15s ease;
+}
+.cb-panel.open { display: block; }
+@keyframes dropIn {
+  from { opacity:0; transform: translateY(-6px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+.cb-search {
+  width: 100%; font-family: 'DM Mono'; font-size: 11px;
+  padding: 10px 12px; border: none; outline: none;
+  background: var(--surface3); color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.cb-search::placeholder { color: var(--text3); }
+.cb-actions {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+.cb-action-btn {
+  flex: 1; font-family: 'Syne'; font-size: 9px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 7px 8px; border: none; cursor: pointer;
+  background: transparent; color: var(--text3);
+  transition: all 0.1s;
+}
+.cb-action-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+.cb-action-btn + .cb-action-btn { border-left: 1px solid var(--border); }
+.cb-list {
+  max-height: 220px; overflow-y: auto;
+  padding: 6px 0;
+}
+.cb-list::-webkit-scrollbar { width: 3px; }
+.cb-list::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+.cb-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px; cursor: pointer;
+  transition: background 0.1s;
+  font-family: 'DM Mono'; font-size: 11px; color: var(--text2);
+}
+.cb-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+.cb-item.checked { color: var(--text); }
+
+/* Custom checkbox */
+.cb-box {
+  width: 15px; height: 15px; flex-shrink: 0;
+  border: 1.5px solid var(--text3); border-radius: 4px;
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.cb-item.checked .cb-box {
+  background: var(--blue); border-color: var(--blue);
+}
+.cb-check-icon { font-size: 9px; color: #000; display: none; font-weight: 700; }
+.cb-item.checked .cb-check-icon { display: block; }
+.cb-item-count {
+  margin-left: auto; font-size: 9px; color: var(--text3);
+  background: rgba(255,255,255,0.05);
+  padding: 1px 6px; border-radius: 8px;
+}
+
+/* BUTTONS */
+.btn-reset {
+  font-family: 'Syne'; font-size: 11px; font-weight: 600;
+  padding: 8px 16px; border-radius: 10px;
+  border: 1px solid rgba(255,87,87,0.3);
+  background: rgba(255,87,87,0.07);
+  color: var(--red); cursor: pointer; transition: all 0.15s;
+  align-self: flex-end; height: 38px;
+}
+.btn-reset:hover { background: rgba(255,87,87,0.15); }
+.filter-info {
+  font-family: 'DM Mono'; font-size: 10px;
+  color: var(--text2); margin-left: auto; align-self: flex-end;
+  padding-bottom: 9px;
+}
+.filter-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'DM Mono'; font-size: 10px;
+  padding: 3px 10px; border-radius: 20px;
+  background: rgba(59,158,255,0.12); color: var(--blue);
+  border: 1px solid rgba(59,158,255,0.25);
+}
+.chip-x {
+  cursor: pointer; opacity: 0.6; font-size: 13px; line-height: 1;
+  margin-left: 2px;
+}
+.chip-x:hover { opacity: 1; }
+
+/* KPI GRID */
+.kpi-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 10px; margin-bottom: 14px;
+}
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.kpi:hover { transform: translateY(-2px); }
+.kpi-accent {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: 14px 14px 0 0;
+}
+.kpi-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.kpi-value {
+  font-family: 'DM Mono'; font-size: 28px; font-weight: 500;
+  letter-spacing: -0.03em; line-height: 1;
+}
+.kpi-sub { font-size: 9px; color: var(--text3); margin-top: 4px; font-family: 'DM Mono'; }
+
+/* GRID LAYOUTS */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.card-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text2);
+  margin-bottom: 12px;
+}
+.chart-wrap { position: relative; width: 100%; }
+
+/* SECTION DIVIDER */
+.sec {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text3);
+  margin: 14px 0 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.sec::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.sec span { color: var(--blue); font-family: 'DM Mono'; }
+
+/* TABLE */
+table { width: 100%; border-collapse: collapse; font-size: 10px; }
+th {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text3);
+  padding: 5px 7px; border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+td {
+  padding: 6px 7px; border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: var(--text2); font-family: 'DM Mono'; font-size: 10px;
+}
+tr:hover td { background: rgba(255,255,255,0.02); color: var(--text); }
+tr:last-child td { border: none; }
+
+/* PILLS */
+.pill {
+  display: inline-flex; align-items: center;
+  font-family: 'DM Mono'; font-size: 9px; font-weight: 500;
+  padding: 2px 8px; border-radius: 20px;
+}
+.pill-green { background: rgba(0,229,160,0.12); color: var(--green); border: 1px solid rgba(0,229,160,0.2); }
+.pill-red   { background: rgba(255,87,87,0.12);  color: var(--red);   border: 1px solid rgba(255,87,87,0.2); }
+.pill-amber { background: rgba(255,178,63,0.12); color: var(--amber); border: 1px solid rgba(255,178,63,0.2); }
+.pill-blue  { background: rgba(59,158,255,0.12); color: var(--blue);  border: 1px solid rgba(59,158,255,0.2); }
+
+/* PROGRESS */
+.prog-wrap { background: rgba(255,255,255,0.05); border-radius: 4px; height: 4px; margin-top: 5px; overflow: hidden; }
+.prog-bar { height: 4px; border-radius: 4px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+
+/* LEGENDS */
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--text3); }
+.legend-sq { width: 8px; height: 8px; border-radius: 2px; }
+
+/* ACHIEVEMENT BIG */
+.ach-num {
+  font-family: 'DM Mono'; font-size: 44px; font-weight: 500;
+  letter-spacing: -0.04em; line-height: 1;
+}
+.ach-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 6px; }
+
+/* EMPTY STATE */
+.empty {
+  text-align: center; padding: 60px 20px;
+  color: var(--text3); font-size: 13px;
+}
+.empty big { display: block; font-size: 32px; margin-bottom: 8px; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(3,1fr); }
+  .g2, .g3 { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .kpi-grid { grid-template-columns: repeat(2,1fr); }
+  .header { flex-wrap: wrap; gap: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-brand">
+      <div class="header-icon">🚛</div>
+      <div>
+        <div class="header-title">Monitoring Realisasi Kedatangan</div>
+        <div class="header-sub">MULTISITE · <span id="tsLabel">-</span></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="live-pill"><span class="live-dot"></span>LIVE DATA</span>
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <div class="filter-top">
+
+      <!-- SITE FILTER -->
+      <div class="filter-group" id="grpSite">
+        <div class="filter-label">🏭 Supply Site</div>
+        <div class="cb-trigger" id="trigSite" onclick="togglePanel('site')">
+          <span class="cb-trigger-text" id="lblSite">Semua Site</span>
+          <span class="cb-trigger-count" id="cntSite">0</span>
+          <span class="cb-arrow">▼</span>
+        </div>
+        <div class="cb-panel" id="panelSite">
+          <input class="cb-search" placeholder="🔍 Cari site..." oninput="searchCb('site',this.value)">
+          <div class="cb-actions">
+            <button class="cb-action-btn" onclick="selectAll('site')">Pilih Semua</button>
+            <button class="cb-action-btn" onclick="clearAll('site')">Hapus Semua</button>
+          </div>
+          <div class="cb-list" id="listSite"></div>
+        </div>
+      </div>
+
+      <!-- TANGGAL FILTER -->
+      <div class="filter-group" id="grpTgl">
+        <div class="filter-label">📅 Tanggal Stuffing</div>
+        <div class="cb-trigger" id="trigTgl" onclick="togglePanel('tgl')">
+          <span class="cb-trigger-text" id="lblTgl">Semua Tanggal</span>
+          <span class="cb-trigger-count" id="cntTgl">0</span>
+          <span class="cb-arrow">▼</span>
+        </div>
+        <div class="cb-panel" id="panelTgl">
+          <input class="cb-search" placeholder="🔍 Cari tanggal..." oninput="searchCb('tgl',this.value)">
+          <div class="cb-actions">
+            <button class="cb-action-btn" onclick="selectAll('tgl')">Pilih Semua</button>
+            <button class="cb-action-btn" onclick="clearAll('tgl')">Hapus Semua</button>
+          </div>
+          <div class="cb-list" id="listTgl"></div>
+        </div>
+      </div>
+
+      <!-- BATCH FILTER -->
+      <div class="filter-group" id="grpBatch">
+        <div class="filter-label">⏰ Batch / Slot Checkin</div>
+        <div class="cb-trigger" id="trigBatch" onclick="togglePanel('batch')">
+          <span class="cb-trigger-text" id="lblBatch">Semua Batch</span>
+          <span class="cb-trigger-count" id="cntBatch">0</span>
+          <span class="cb-arrow">▼</span>
+        </div>
+        <div class="cb-panel" id="panelBatch">
+          <input class="cb-search" placeholder="🔍 Cari slot..." oninput="searchCb('batch',this.value)">
+          <div class="cb-actions">
+            <button class="cb-action-btn" onclick="selectAll('batch')">Pilih Semua</button>
+            <button class="cb-action-btn" onclick="clearAll('batch')">Hapus Semua</button>
+          </div>
+          <div class="cb-list" id="listBatch"></div>
+        </div>
+      </div>
+
+      <button class="btn-reset" onclick="resetFilters()">✕ Reset</button>
+      <div class="filter-info" id="filterInfo">Memuat data...</div>
+    </div>
+    <div class="filter-chips" id="filterChips" style="display:none"></div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="mainContent"></div>
+
+</div>
+
+<script>
+document.getElementById('tsLabel').textContent = new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIVE CSV SOURCE — Google Sheets Published CSV
+// ─────────────────────────────────────────────────────────────────────────────
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRw1RR5r8oBsL24e9Feti3GuztTNHQakUHmnj7rXTp00GUOhWPt3noXCpjO6GJ6RkG0NPQY2uIughFT/pub?gid=602890489&single=true&output=csv';
+
+let DATA = [];
+
+// ── CSV PARSER ────────────────────────────────────────────────────────────────
+function parseCSV(text){
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h=>h.replace(/^"|"$/g,'').trim());
+  return lines.slice(1).map(line=>{
+    // handle quoted fields with commas inside
+    const cols = [];
+    let inQ=false, cur='';
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){ inQ=!inQ; }
+      else if(c===','&&!inQ){ cols.push(cur.trim()); cur=''; }
+      else { cur+=c; }
+    }
+    cols.push(cur.trim());
+    const obj={};
+    headers.forEach((h,i)=>{ obj[h]=cols[i]||''; });
+    return obj;
+  }).filter(r=>Object.values(r).some(v=>v!==''));
+}
+
+// ── TIME STRING → MINUTES ──────────────────────────────────────────────────
+function timeToMin(t){
+  if(!t||t==='')return null;
+  t=String(t).replace(/"/g,'').trim();
+  const neg=t.startsWith('-'); t=t.replace('-','');
+  const parts=t.split(':');
+  const h=parseInt(parts[0])||0, m=parseInt(parts[1])||0;
+  const total=h*60+m;
+  return neg?-total:total;
+}
+
+// ── MAP CSV ROW → INTERNAL OBJECT ────────────────────────────────────────────
+function mapRow(r){
+  // Detect column names (case-insensitive, trimmed)
+  const k = (name) => {
+    const keys = Object.keys(r);
+    const found = keys.find(k2=>k2.toLowerCase().replace(/\s+/g,'').includes(name.toLowerCase().replace(/\s+/g,'')));
+    return found ? (r[found]||'').toString().trim() : '';
+  };
+
+  const site    = k('SUPPLY SITE')||k('SITE');
+  const lc      = k('LC');
+  const armada  = k('TYPE ARMADA')||k('ARMADA');
+  const tgl     = k('TANGGAL STUFFING')||k('TANGGAL');
+  const jamStr  = k('JAM CHECKIN')||k('JAM');
+  const batch   = k('KATEGORI CHECKIN')||k('BATCH')||k('SLOT');
+  const ked     = (k('STATUS KEDATANGAN')||'').toUpperCase();
+  const otf     = (k('OTF')||'').toUpperCase();
+  const ota     = (k('OTA')||'').toUpperCase();
+  const agingStr= k('AGING DELAY OTA')||k('AGING');
+  const ka      = k('KATEGORI AGING')||'';
+  const tungguStr = k('TUNGGU MUAT')||k('TUNGGU');
+  const muatStr   = k('PROSES MUAT')||k('MUAT');
+
+  // Parse jam from HH:MM:SS or numeric (Google Sheets serial fraction)
+  let jam = null;
+  if(jamStr && jamStr!==''){
+    if(jamStr.includes(':')){
+      jam = parseInt(jamStr.split(':')[0]);
+    } else {
+      const frac=parseFloat(jamStr);
+      if(!isNaN(frac)) jam=Math.floor(frac*24);
+    }
+  }
+
+  return {
+    site, lc, armada, tgl, jam,
+    batch: batch||'',
+    ked: ked.includes('SUDAH')||ked==='1'||ked.includes('DATANG')&&!ked.includes('BELUM') ? 'SUDAH DATANG' : 'BELUM DATANG',
+    otf: otf==='HIT'?'HIT':'MIS',
+    ota: ota==='HIT'?'HIT':'MIS',
+    aging: agingStr?timeToMin(agingStr):null,
+    ka,
+    tunggu: timeToMin(tungguStr),
+    muat:   timeToMin(muatStr),
+  };
+}
+
+// ── LOADING UI ────────────────────────────────────────────────────────────────
+function showLoading(){
+  document.getElementById('mainContent').innerHTML=`
+    <div style="text-align:center;padding:80px 20px;color:var(--text3)">
+      <div style="font-size:32px;margin-bottom:12px;animation:spin 1s linear infinite;display:inline-block">⟳</div>
+      <div style="font-size:13px;margin-top:8px">Mengambil data dari Google Sheets...</div>
+      <div style="font-size:10px;font-family:'DM Mono';margin-top:4px;color:var(--text3)">${CSV_URL.substring(0,60)}...</div>
+    </div>`;
+}
+
+function showError(msg){
+  document.getElementById('mainContent').innerHTML=`
+    <div style="text-align:center;padding:60px 20px">
+      <div style="font-size:28px;margin-bottom:10px">⚠️</div>
+      <div style="font-size:13px;color:var(--red);margin-bottom:8px">Gagal memuat data dari Google Sheets</div>
+      <div style="font-size:10px;color:var(--text3);font-family:'DM Mono';margin-bottom:16px">${msg}</div>
+      <button class="btn-reset" style="color:var(--blue);border-color:rgba(59,158,255,0.3);background:rgba(59,158,255,0.08)" onclick="loadData()">🔄 Coba Lagi</button>
+      <div style="font-size:9px;color:var(--text3);margin-top:12px">
+        Pastikan sheet sudah di-publish:<br>
+        File → Share → Publish to web → CSV
+      </div>
+    </div>`;
+}
+
+// ── MAIN LOADER ───────────────────────────────────────────────────────────────
+async function loadData(){
+  showLoading();
+  document.getElementById('filterInfo').textContent='Memuat...';
+  try {
+    const resp = await fetch(CSV_URL, {cache:'no-cache'});
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    if(!text||text.trim().length<10) throw new Error('Data kosong');
+
+    const rows = parseCSV(text);
+    DATA = rows.map(mapRow).filter(r=>r.site && r.site!=='SUPPLY SITE');
+
+    document.getElementById('tsLabel').textContent =
+      `Data diperbarui: ${new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})} · ${DATA.length} baris`;
+
+    // Re-populate filters with fresh data
+    SEL.site.clear(); SEL.tgl.clear(); SEL.batch.clear();
+    Object.keys(META.site).forEach(k=>delete META.site[k]);
+    Object.keys(META.tgl).forEach(k=>delete META.tgl[k]);
+    Object.keys(META.batch).forEach(k=>delete META.batch[k]);
+    populateFilters();
+
+    filtered=[...DATA];
+    document.getElementById('filterInfo').textContent=`Semua data · ${DATA.length} order`;
+    renderAll();
+
+  } catch(e){
+    showError(e.message);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FALLBACK STATIC DATA (dipakai jika fetch gagal / untuk preview)
+// ─────────────────────────────────────────────────────────────────────────────
+const STATIC_DATA = [
+  // ── CIKANDE ──────────────────────────────────────────────────────────────
+  {site:'CIKANDE',lc:'260519HS007',armada:'CONT-40',tgl:'20 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:152,muat:1},
+  {site:'CIKANDE',lc:'260519HS008',armada:'CONT-40',tgl:'20 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-78,muat:1},
+  {site:'CIKANDE',lc:'260519HS009',armada:'CONT-40',tgl:'20 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-31,muat:177},
+  {site:'CIKANDE',lc:'260520HS003',armada:'CONT-40',tgl:'20 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:199,muat:118},
+  {site:'CIKANDE',lc:'260520HS004',armada:'CONT-40',tgl:'20 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:376,muat:127},
+  {site:'CIKANDE',lc:'260520HS005',armada:'CONT-40',tgl:'20 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-112,muat:255},
+  {site:'CIKANDE',lc:'260520HS006',armada:'CONT-40',tgl:'20 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:204,muat:114},
+  {site:'CIKANDE',lc:'260520HS007',armada:'CONT-40',tgl:'20 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:60,muat:84},
+  {site:'CIKANDE',lc:'260520HS001',armada:'CONT-40',tgl:'20 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:502,muat:1},
+  {site:'CIKANDE',lc:'260520HS008',armada:'CONT-40',tgl:'21 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-428,muat:77},
+  {site:'CIKANDE',lc:'260520HS009',armada:'CONT-40',tgl:'21 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-128,muat:1},
+  {site:'CIKANDE',lc:'260520HS010',armada:'CONT-40',tgl:'21 Mei',jam:14,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-89,muat:448},
+  {site:'CIKANDE',lc:'260521HS001',armada:'CONT-40',tgl:'21 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:358,muat:235},
+  {site:'CIKANDE',lc:'260521HS002',armada:'CONT-40',tgl:'21 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-122,muat:341},
+  {site:'CIKANDE',lc:'260521HS003',armada:'CONT-40',tgl:'21 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-117,muat:343},
+  {site:'CIKANDE',lc:'260521HS004',armada:'CONT-40',tgl:'21 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:224,muat:0},
+  {site:'CIKANDE',lc:'260521HS005',armada:'CONT-40',tgl:'21 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:595,muat:1},
+  {site:'CIKANDE',lc:'260521HS008',armada:'CONT-40',tgl:'21 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:213,muat:148},
+  {site:'CIKANDE',lc:'260520HS002',armada:'CONT-40',tgl:'21 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:353,muat:1},
+  {site:'CIKANDE',lc:'260521HS010',armada:'CONT-40',tgl:'21 Mei',jam:14,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:600,muat:1},
+  {site:'CIKANDE',lc:'260521HS006',armada:'CONT-40',tgl:'22 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-421,muat:1522},
+  {site:'CIKANDE',lc:'260521HS007',armada:'CONT-40',tgl:'22 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-422,muat:95},
+  {site:'CIKANDE',lc:'260522HS001',armada:'CONT-40',tgl:'22 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:352,muat:1},
+  {site:'CIKANDE',lc:'260522HS002',armada:'CONT-40',tgl:'22 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:392,muat:172},
+  {site:'CIKANDE',lc:'260522HS003',armada:'CONT-40',tgl:'22 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:391,muat:93},
+  {site:'CIKANDE',lc:'260522HS004',armada:'CONT-40',tgl:'22 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:355,muat:0},
+  {site:'CIKANDE',lc:'260522HS005',armada:'CONT-40',tgl:'22 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:440,muat:122},
+  {site:'CIKANDE',lc:'260522HS006',armada:'CONT-40',tgl:'22 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:39,ka:'',tunggu:719,muat:1},
+  {site:'CIKANDE',lc:'260522HS007',armada:'CONT-40',tgl:'22 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:344,muat:1},
+  {site:'CIKANDE',lc:'260522HS008',armada:'CONT-40',tgl:'21 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:1048,ka:'',tunggu:740,muat:1},
+  {site:'CIKANDE',lc:'260521HS009',armada:'CONT-40',tgl:'22 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-115,muat:1214},
+  {site:'CIKANDE',lc:'260522HS009',armada:'CONT-40',tgl:'22 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:19,ka:'',tunggu:682,muat:1},
+  {site:'CIKANDE',lc:'260522HS010',armada:'CONT-40',tgl:'22 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:37,ka:'',tunggu:1425,muat:174},
+  {site:'CIKANDE',lc:'260523HS006',armada:'CONT-40',tgl:'23 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:197,muat:39},
+  {site:'CIKANDE',lc:'260523HS007',armada:'CONT-40',tgl:'23 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:257,muat:93},
+  {site:'CIKANDE',lc:'260523HS008',armada:'CONT-40',tgl:'23 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:345,muat:151},
+  {site:'CIKANDE',lc:'260523HS009',armada:'CONT-40',tgl:'23 Mei',jam:15,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:1106,muat:158},
+  {site:'CIKANDE',lc:'260523HS010',armada:'CONT-40',tgl:'23 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:1110,muat:179},
+  {site:'CIKANDE',lc:'260523HS011',armada:'CONT-40',tgl:'23 Mei',jam:11,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:260,muat:74},
+  {site:'CIKANDE',lc:'260523HS013',armada:'WINGBOX',tgl:'23 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'13-24 Jam',tunggu:-195,muat:25},
+  {site:'CIKANDE',lc:'260523HS002',armada:'CONT-40',tgl:'23 Mei',jam:15,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'Lebih dari 24 Jam',tunggu:1123,muat:378},
+  {site:'CIKANDE',lc:'260523HS003',armada:'CONT-40',tgl:'23 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:28,muat:167},
+  {site:'CIKANDE',lc:'260523HS004',armada:'CONT-40',tgl:'23 Mei',jam:16,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:15,ka:'Lebih dari 24 Jam',tunggu:1399,muat:87},
+  {site:'CIKANDE',lc:'260523HS005',armada:'CONT-40',tgl:'23 Mei',jam:15,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:344,muat:155},
+  {site:'CIKANDE',lc:'260524HS001',armada:'CONT-40',tgl:'24 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'1-4 Jam',tunggu:-327,muat:388},
+  {site:'CIKANDE',lc:'260524HS002',armada:'CONT-40',tgl:'24 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'1-4 Jam',tunggu:-323,muat:384},
+  {site:'CIKANDE',lc:'260524HS003',armada:'CONT-40',tgl:'24 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'1-4 Jam',tunggu:61,muat:0},
+  {site:'CIKANDE',lc:'260524HS004',armada:'CONT-40',tgl:'24 Mei',jam:14,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'1-4 Jam',tunggu:61,muat:0},
+  {site:'CIKANDE',lc:'260524HS005',armada:'CONT-40',tgl:'24 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'1-4 Jam',tunggu:-320,muat:381},
+  {site:'CIKANDE',lc:'260525HS001',armada:'CONT-40',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'CIKANDE',lc:'260525HS002',armada:'CONT-40',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'CIKANDE',lc:'260525HS003',armada:'CONT-40',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'CIKANDE',lc:'260525HS004',armada:'CONT-40',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'CIKANDE',lc:'260525HS005',armada:'CONT-40',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'CIKANDE',lc:'260525HS006',armada:'CONT-40',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  // ── HCI CIKUPA ────────────────────────────────────────────────────────────
+  {site:'HCI CIKUPA',lc:'260514T053',armada:'CONT-20',tgl:'16 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:186,ka:'',tunggu:12,muat:88},
+  {site:'HCI CIKUPA',lc:'260516H008',armada:'WINGBOX',tgl:'15 Mei',jam:16,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-76,muat:170},
+  {site:'HCI CIKUPA',lc:'260516H009',armada:'CDD LONG CHASSIS',tgl:'16 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:48,muat:76},
+  {site:'HCI CIKUPA',lc:'260516H010',armada:'FUSO',tgl:'15 Mei',jam:16,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-72,muat:167},
+  {site:'HCI CIKUPA',lc:'260516T008',armada:'WINGBOX',tgl:'16 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:14,muat:194},
+  {site:'HCI CIKUPA',lc:'260516T009',armada:'CONT-40',tgl:'16 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:28,muat:338},
+  {site:'HCI CIKUPA',lc:'260516H015',armada:'FUSO',tgl:'16 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:18,muat:179},
+  {site:'HCI CIKUPA',lc:'260516T010',armada:'CONT-40',tgl:'16 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-71,muat:164},
+  {site:'HCI CIKUPA',lc:'260516T011',armada:'CONT-40',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-20,muat:261},
+  {site:'HCI CIKUPA',lc:'260516H016',armada:'CDD LONG CHASSIS',tgl:'16 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:49,muat:135},
+  {site:'HCI CIKUPA',lc:'260516H017',armada:'CDD LONG CHASSIS',tgl:'16 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:49,muat:318},
+  {site:'HCI CIKUPA',lc:'260517H006',armada:'CDD LONG CHASSIS',tgl:'17 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:44,ka:'',tunggu:184,muat:135},
+  {site:'HCI CIKUPA',lc:'260517H007',armada:'FUSO',tgl:'17 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:30,muat:143},
+  {site:'HCI CIKUPA',lc:'260517H008',armada:'CDD LONG CHASSIS',tgl:'17 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:35,muat:280},
+  {site:'HCI CIKUPA',lc:'260517T006',armada:'CONT-40',tgl:'17 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:35,ka:'',tunggu:49,muat:175},
+  {site:'HCI CIKUPA',lc:'260517H016',armada:'WINGBOX',tgl:'17 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:31,muat:290},
+  {site:'HCI CIKUPA',lc:'260518T011',armada:'WINGBOX',tgl:'18 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:8,muat:268},
+  {site:'HCI CIKUPA',lc:'260518H013',armada:'CDD LONG CHASSIS',tgl:'18 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:9,muat:198},
+  {site:'HCI CIKUPA',lc:'260518T012',armada:'CDD LONG CHASSIS',tgl:'18 Mei',jam:11,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:184,ka:'',tunggu:133,muat:95},
+  {site:'HCI CIKUPA',lc:'260518T013',armada:'CONT-40',tgl:'18 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:10,muat:397},
+  {site:'HCI CIKUPA',lc:'260518T028',armada:'CONT-20',tgl:'18 Mei',jam:21,batch:'21:00 - 00:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:676,ka:'',tunggu:29,muat:123},
+  {site:'HCI CIKUPA',lc:'260518H068',armada:'CDD LONG CHASSIS',tgl:'18 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:40,ka:'',tunggu:148,muat:99},
+  {site:'HCI CIKUPA',lc:'260519H005',armada:'CDD LONG CHASSIS',tgl:'19 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:35,muat:143},
+  {site:'HCI CIKUPA',lc:'260519T004',armada:'CONT-40',tgl:'19 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-73,muat:367},
+  {site:'HCI CIKUPA',lc:'260519T006',armada:'CONT-40',tgl:'19 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-72,muat:344},
+  {site:'HCI CIKUPA',lc:'260519T009',armada:'CDD LONG CHASSIS',tgl:'19 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:32,ka:'',tunggu:258,muat:109},
+  {site:'HCI CIKUPA',lc:'260520T005',armada:'CONT-40',tgl:'20 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:31,muat:418},
+  {site:'HCI CIKUPA',lc:'260520T007',armada:'WINGBOX',tgl:'20 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:18,muat:182},
+  {site:'HCI CIKUPA',lc:'260520T058',armada:'CONT-40',tgl:'20 Mei',jam:17,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:266,ka:'',tunggu:98,muat:119},
+  {site:'HCI CIKUPA',lc:'260521H002',armada:'FUSO',tgl:'20 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:1365,ka:'',tunggu:108,muat:156},
+  {site:'HCI CIKUPA',lc:'260521H003',armada:'FUSO',tgl:'20 Mei',jam:17,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:49,muat:138},
+  {site:'HCI CIKUPA',lc:'260522H005',armada:'FUSO',tgl:'22 Mei',jam:16,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:532,ka:'',tunggu:192,muat:132},
+  {site:'HCI CIKUPA',lc:'260522T003',armada:'WINGBOX',tgl:'22 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:7,muat:316},
+  {site:'HCI CIKUPA',lc:'260523T009',armada:'WINGBOX',tgl:'23 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:37,ka:'',tunggu:14,muat:157},
+  {site:'HCI CIKUPA',lc:'260523T011',armada:'CONT-40',tgl:'23 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-101,muat:320},
+  {site:'HCI CIKUPA',lc:'260523T013',armada:'CONT-40',tgl:'23 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-74,muat:358},
+  {site:'HCI CIKUPA',lc:'260524T008',armada:'WINGBOX',tgl:'24 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:28,muat:185},
+  {site:'HCI CIKUPA',lc:'260524H006',armada:'FUSO',tgl:'24 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:15,muat:159},
+  {site:'HCI CIKUPA',lc:'260524H045',armada:'CDD LONG CHASSIS',tgl:'24 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:38,ka:'',tunggu:37,muat:269},
+  {site:'HCI CIKUPA',lc:'260525T034',armada:'WINGBOX',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI CIKUPA',lc:'260525H015',armada:'WINGBOX',tgl:'24 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI CIKUPA',lc:'260525H016',armada:'CDD LONG CHASSIS',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI CIKUPA',lc:'260525H017',armada:'CDD LONG CHASSIS',tgl:'24 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI CIKUPA',lc:'260525H019',armada:'FUSO',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  // ── HCI JABABEKA ──────────────────────────────────────────────────────────
+  {site:'HCI JABABEKA',lc:'260517L003',armada:'WINGBOX',tgl:'17 Mei',jam:12,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:69,muat:503},
+  {site:'HCI JABABEKA',lc:'260517H033',armada:'WINGBOX',tgl:'17 Mei',jam:19,batch:'18:00 - 21:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:395,ka:'',tunggu:39,muat:203},
+  {site:'HCI JABABEKA',lc:'260517H034',armada:'WINGBOX',tgl:'17 Mei',jam:14,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:64,muat:310},
+  {site:'HCI JABABEKA',lc:'260517H037',armada:'CDD LONG',tgl:'17 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:215,muat:388},
+  {site:'HCI JABABEKA',lc:'260517H038',armada:'CDD LONG CHASSIS',tgl:'17 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:100,muat:246},
+  {site:'HCI JABABEKA',lc:'260518T035',armada:'CONT-40',tgl:'18 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:1570,ka:'',tunggu:135,muat:151},
+  {site:'HCI JABABEKA',lc:'260518T036',armada:'CONT-40',tgl:'18 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:226,muat:157},
+  {site:'HCI JABABEKA',lc:'260518T039',armada:'CONT-40',tgl:'18 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:2878,ka:'',tunggu:4,muat:116},
+  {site:'HCI JABABEKA',lc:'260518T040',armada:'CONT-40',tgl:'18 Mei',jam:12,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:138,ka:'',tunggu:157,muat:13},
+  {site:'HCI JABABEKA',lc:'260518T043',armada:'CONT-40',tgl:'18 Mei',jam:12,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:137,ka:'',tunggu:205,muat:11},
+  {site:'HCI JABABEKA',lc:'260518T044',armada:'CONT-40',tgl:'18 Mei',jam:16,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:393,ka:'',tunggu:1068,muat:20},
+  {site:'HCI JABABEKA',lc:'260518T047',armada:'CONT-40',tgl:'18 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:1492,ka:'',tunggu:29,muat:311},
+  {site:'HCI JABABEKA',lc:'260519H037',armada:'WINGBOX',tgl:'19 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:35,muat:850},
+  {site:'HCI JABABEKA',lc:'260519H043',armada:'CDD LONG CHASSIS',tgl:'19 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-62,muat:475},
+  {site:'HCI JABABEKA',lc:'260519T013',armada:'CONT-40',tgl:'19 Mei',jam:16,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:59,ka:'',tunggu:403,muat:1},
+  {site:'HCI JABABEKA',lc:'260520H039',armada:'WINGBOX',tgl:'20 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-29,muat:193},
+  {site:'HCI JABABEKA',lc:'260520T015',armada:'WINGBOX',tgl:'20 Mei',jam:12,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:211,muat:320},
+  {site:'HCI JABABEKA',lc:'260521H029',armada:'WINGBOX',tgl:'21 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:195,muat:404},
+  {site:'HCI JABABEKA',lc:'260521T010',armada:'CONT-40',tgl:'21 Mei',jam:12,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:250,ka:'',tunggu:233,muat:495},
+  {site:'HCI JABABEKA',lc:'260522T017',armada:'WINGBOX',tgl:'22 Mei',jam:12,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:400,muat:189},
+  {site:'HCI JABABEKA',lc:'260522H036',armada:'WINGBOX',tgl:'22 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:99,ka:'Lebih dari 24 Jam',tunggu:261,muat:3070},
+  {site:'HCI JABABEKA',lc:'260523T027',armada:'CONT-40',tgl:'23 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:285,muat:162},
+  {site:'HCI JABABEKA',lc:'260523T028',armada:'CONT-40',tgl:'23 Mei',jam:15,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:392,muat:201},
+  {site:'HCI JABABEKA',lc:'260524T025',armada:'WINGBOX',tgl:'24 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:14,ka:'1-4 Jam',tunggu:236,muat:0},
+  {site:'HCI JABABEKA',lc:'260524H034',armada:'CDD LONG CHASSIS',tgl:'24 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:21,ka:'9-12 Jam',tunggu:299,muat:97},
+  {site:'HCI JABABEKA',lc:'260525H040',armada:'WINGBOX',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI JABABEKA',lc:'260525T039',armada:'WINGBOX',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI JABABEKA',lc:'260525H042',armada:'WINGBOX',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI JABABEKA',lc:'260525H043',armada:'WINGBOX',tgl:'24 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI JABABEKA',lc:'260525T040',armada:'WINGBOX',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  // ── AHI JABABEKA ──────────────────────────────────────────────────────────
+  {site:'AHI JABABEKA',lc:'260516L028',armada:'CDD LONG CHASSIS',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:177,muat:485},
+  {site:'AHI JABABEKA',lc:'260516L030',armada:'CDD LONG CHASSIS',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-20,muat:301},
+  {site:'AHI JABABEKA',lc:'260516L039',armada:'FUSO',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:1482,ka:'',tunggu:156,muat:320},
+  {site:'AHI JABABEKA',lc:'260516T014',armada:'CONT-40',tgl:'16 Mei',jam:11,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:82,muat:497},
+  {site:'AHI JABABEKA',lc:'260517L006',armada:'CDD LONG CHASSIS',tgl:'17 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:119,muat:285},
+  {site:'AHI JABABEKA',lc:'260517L007',armada:'CONT-20',tgl:'17 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:1433,ka:'',tunggu:192,muat:130},
+  {site:'AHI JABABEKA',lc:'260517T004',armada:'CONT-20',tgl:'17 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-92,muat:195},
+  {site:'AHI JABABEKA',lc:'260518L006',armada:'CONT-20',tgl:'18 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:1576,ka:'',tunggu:154,muat:412},
+  {site:'AHI JABABEKA',lc:'260519T007',armada:'CONT-40',tgl:'19 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:120,ka:'',tunggu:275,muat:149},
+  {site:'AHI JABABEKA',lc:'260519T011',armada:'CONT-40',tgl:'19 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:39,ka:'',tunggu:242,muat:439},
+  {site:'AHI JABABEKA',lc:'260519T046',armada:'CONT-40',tgl:'19 Mei',jam:21,batch:'21:00 - 00:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:355,muat:287},
+  {site:'AHI JABABEKA',lc:'260520T013',armada:'CONT-20',tgl:'20 Mei',jam:20,batch:'18:00 - 21:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:294,ka:'',tunggu:121,muat:76},
+  {site:'AHI JABABEKA',lc:'260521T006',armada:'CONT-40',tgl:'21 Mei',jam:12,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:268,ka:'',tunggu:453,muat:179},
+  {site:'AHI JABABEKA',lc:'260521T007',armada:'CONT-40',tgl:'21 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'MIS',ota:'MIS',aging:1388,ka:'',tunggu:134,muat:445},
+  {site:'AHI JABABEKA',lc:'260521T030',armada:'CONT-40',tgl:'21 Mei',jam:18,batch:'18:00 - 21:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:203,muat:518},
+  {site:'AHI JABABEKA',lc:'260522T011',armada:'CONT-40',tgl:'22 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:589,muat:263},
+  {site:'AHI JABABEKA',lc:'260522T013',armada:'CONT-40',tgl:'22 Mei',jam:14,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:398,ka:'',tunggu:410,muat:435},
+  {site:'AHI JABABEKA',lc:'260523T015',armada:'CONT-40',tgl:'23 Mei',jam:11,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:188,ka:'',tunggu:533,muat:78},
+  {site:'AHI JABABEKA',lc:'260523T017',armada:'CONT-40',tgl:'23 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:42,muat:311},
+  {site:'AHI JABABEKA',lc:'260524T009',armada:'CONT-40',tgl:'24 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'9-12 Jam',tunggu:550,muat:0},
+  {site:'AHI JABABEKA',lc:'260524T014',armada:'CONT-40',tgl:'24 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:193,muat:17},
+  {site:'AHI JABABEKA',lc:'260525T016',armada:'CONT-40',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'AHI JABABEKA',lc:'260525T017',armada:'CONT-40',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'AHI JABABEKA',lc:'260525L033',armada:'CDD LONG CHASSIS',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'AHI JABABEKA',lc:'260525L034',armada:'FUSO',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'AHI JABABEKA',lc:'260525L035',armada:'CDD LONG CHASSIS',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  // ── IND JABABEKA ──────────────────────────────────────────────────────────
+  {site:'IND JABABEKA',lc:'260516L006',armada:'CDD BAK',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:61,muat:109},
+  {site:'IND JABABEKA',lc:'260516L007',armada:'CDD BAK',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-50,muat:220},
+  {site:'IND JABABEKA',lc:'260516L008',armada:'CDD BAK',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:208,muat:78},
+  {site:'IND JABABEKA',lc:'260517L024',armada:'CDD BAK',tgl:'17 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-42,muat:68},
+  {site:'IND JABABEKA',lc:'260517L029',armada:'CDD BAK',tgl:'17 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:200,ka:'',tunggu:46,muat:76},
+  {site:'IND JABABEKA',lc:'260518T005',armada:'CONT-20',tgl:'18 Mei',jam:17,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:2602,muat:1},
+  {site:'IND JABABEKA',lc:'260519L017',armada:'CDD BAK',tgl:'19 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-69,muat:104},
+  {site:'IND JABABEKA',lc:'260520L010',armada:'CDD BAK',tgl:'20 Mei',jam:9,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:28,muat:65},
+  {site:'IND JABABEKA',lc:'260521L011',armada:'CDD BAK',tgl:'21 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:4,muat:90},
+  {site:'IND JABABEKA',lc:'260522T023',armada:'WINGBOX',tgl:'22 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:635,muat:238},
+  {site:'IND JABABEKA',lc:'260523L023',armada:'CDD BAK',tgl:'23 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:43,muat:148},
+  {site:'IND JABABEKA',lc:'260523L028',armada:'CDD BAK',tgl:'23 Mei',jam:14,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:280,ka:'',tunggu:98,muat:94},
+  {site:'IND JABABEKA',lc:'260524L017',armada:'CDD BAK',tgl:'24 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-23,muat:93},
+  {site:'IND JABABEKA',lc:'260525L025',armada:'CDD BAK',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'IND JABABEKA',lc:'260525L026',armada:'CDD BAK',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'IND JABABEKA',lc:'260525T033',armada:'CONT-20',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  // ── HCI SIDOARJO ──────────────────────────────────────────────────────────
+  {site:'HCI SIDOARJO',lc:'260516T015',armada:'CONT-20',tgl:'16 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:59,muat:129},
+  {site:'HCI SIDOARJO',lc:'260516T016',armada:'CONT-20',tgl:'16 Mei',jam:11,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:95,ka:'',tunggu:107,muat:52},
+  {site:'HCI SIDOARJO',lc:'260516H035',armada:'CDD LONG CHASSIS',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:2,ka:'',tunggu:40,muat:22},
+  {site:'HCI SIDOARJO',lc:'260516T017',armada:'CONT-20',tgl:'16 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-145,muat:143},
+  {site:'HCI SIDOARJO',lc:'260517H010',armada:'WINGBOX',tgl:'17 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:32,muat:132},
+  {site:'HCI SIDOARJO',lc:'260517T009',armada:'CONT-20',tgl:'17 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:47,muat:53},
+  {site:'HCI SIDOARJO',lc:'260517T010',armada:'CONT-20',tgl:'17 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:72,muat:140},
+  {site:'HCI SIDOARJO',lc:'260517T012',armada:'CONT-20',tgl:'17 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:2,ka:'',tunggu:72,muat:174},
+  {site:'HCI SIDOARJO',lc:'260518T003',armada:'WINGBOX',tgl:'18 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:226,ka:'',tunggu:61,muat:298},
+  {site:'HCI SIDOARJO',lc:'260518T004',armada:'CONT-20',tgl:'18 Mei',jam:19,batch:'18:00 - 21:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:206,ka:'',tunggu:45,muat:57},
+  {site:'HCI SIDOARJO',lc:'260518T007',armada:'CONT-20',tgl:'18 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:140,ka:'',tunggu:10,muat:74},
+  {site:'HCI SIDOARJO',lc:'260518H012',armada:'WINGBOX',tgl:'18 Mei',jam:4,batch:'00:00 - 06:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:25,muat:170},
+  {site:'HCI SIDOARJO',lc:'260524H001',armada:'WINGBOX',tgl:'24 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:14,muat:141},
+  {site:'HCI SIDOARJO',lc:'260525T001',armada:'CONT-20',tgl:'24 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:19,muat:110},
+  {site:'HCI SIDOARJO',lc:'260525T004',armada:'CONT-20',tgl:'24 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI SIDOARJO',lc:'260525H002',armada:'CDD LONG CHASSIS',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI SIDOARJO',lc:'260525T005',armada:'CONT-20',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'HCI SIDOARJO',lc:'260525T008',armada:'CONT-20',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  // ── AHI SIDOARJO ──────────────────────────────────────────────────────────
+  {site:'AHI SIDOARJO',lc:'260516L058',armada:'CDD LONG CHASSIS',tgl:'16 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:36,ka:'',tunggu:89,muat:71},
+  {site:'AHI SIDOARJO',lc:'260516L059',armada:'CDD LONG CHASSIS',tgl:'16 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:81,muat:46},
+  {site:'AHI SIDOARJO',lc:'260516L064',armada:'WINGBOX',tgl:'16 Mei',jam:15,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:80,muat:50},
+  {site:'AHI SIDOARJO',lc:'260516L069',armada:'CONT-20',tgl:'16 Mei',jam:15,batch:'15:00 - 18:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:9,muat:59},
+  {site:'AHI SIDOARJO',lc:'260517L020',armada:'WINGBOX',tgl:'17 Mei',jam:4,batch:'00:00 - 06:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:67,muat:136},
+  {site:'AHI SIDOARJO',lc:'260517L021',armada:'CDD LONG CHASSIS',tgl:'17 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:42,ka:'',tunggu:129,muat:39},
+  {site:'AHI SIDOARJO',lc:'260517L031',armada:'CONT-20',tgl:'17 Mei',jam:6,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:74,muat:72},
+  {site:'AHI SIDOARJO',lc:'260518L057',armada:'WINGBOX',tgl:'18 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:59,muat:192},
+  {site:'AHI SIDOARJO',lc:'260518T031',armada:'CONT-20',tgl:'18 Mei',jam:14,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:288,muat:64},
+  {site:'AHI SIDOARJO',lc:'260518L075',armada:'CDD LONG CHASSIS',tgl:'18 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:116,muat:66},
+  {site:'AHI SIDOARJO',lc:'260523L006',armada:'CONT-20',tgl:'23 Mei',jam:11,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:69,muat:160},
+  {site:'AHI SIDOARJO',lc:'260523L008',armada:'CONT-20',tgl:'23 Mei',jam:8,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:186,muat:116},
+  {site:'AHI SIDOARJO',lc:'260523L009',armada:'CDD LONG CHASSIS',tgl:'23 Mei',jam:14,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:78,ka:'',tunggu:150,muat:1},
+  {site:'AHI SIDOARJO',lc:'260524L001',armada:'CDD LONG CHASSIS',tgl:'24 Mei',jam:7,batch:'06:00 - 09:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:32,muat:105},
+  {site:'AHI SIDOARJO',lc:'260524T001',armada:'CONT-20',tgl:'24 Mei',jam:13,batch:'12:00 - 15:00',ked:'SUDAH DATANG',otf:'HIT',ota:'MIS',aging:5,ka:'5-8 Jam',tunggu:155,muat:90},
+  {site:'AHI SIDOARJO',lc:'260524T006',armada:'CONT-20',tgl:'24 Mei',jam:10,batch:'09:00 - 12:00',ked:'SUDAH DATANG',otf:'HIT',ota:'HIT',aging:null,ka:'',tunggu:-110,muat:0},
+  {site:'AHI SIDOARJO',lc:'260523L004',armada:'WINGBOX',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'AHI SIDOARJO',lc:'260523L014',armada:'WINGBOX',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'AHI SIDOARJO',lc:'260524L003',armada:'WINGBOX',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'AHI SIDOARJO',lc:'260525L018',armada:'CDD LONG CHASSIS',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+  {site:'AHI SIDOARJO',lc:'260525T020',armada:'CONT-20',tgl:'25 Mei',jam:null,batch:'',ked:'BELUM DATANG',otf:'',ota:'',aging:null,ka:'',tunggu:null,muat:null},
+];
+
+// ─── CHART REGISTRY ──────────────────────────────────────────────────────────
+const CH = {};
+function killChart(id){ if(CH[id]){ CH[id].destroy(); delete CH[id]; } }
+
+// ─── CHART DEFAULTS ──────────────────────────────────────────────────────────
+Chart.defaults.color = '#7b8fa8';
+Chart.defaults.font.family = 'DM Mono';
+Chart.defaults.font.size = 10;
+
+// ─── POPULATE FILTER DROPDOWNS ───────────────────────────────────────────────
+// ─── CHECKBOX DROPDOWN STATE ─────────────────────────────────────────────────
+const SEL = { site: new Set(), tgl: new Set(), batch: new Set() };
+const META = { site:{}, tgl:{}, batch:{} };  // value -> {label, count}
+let openPanel = null;
+
+// Close panels on outside click
+document.addEventListener('click', e=>{
+  if(openPanel && !e.target.closest('#grp'+cap(openPanel))){
+    closePanel(openPanel); openPanel=null;
+  }
+});
+
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function togglePanel(key){
+  if(openPanel && openPanel!==key){ closePanel(openPanel); }
+  const panel = document.getElementById('panel'+cap(key));
+  const trig  = document.getElementById('trig'+cap(key));
+  if(panel.classList.contains('open')){
+    closePanel(key); openPanel=null;
+  } else {
+    panel.classList.add('open');
+    trig.classList.add('open');
+    openPanel=key;
+    // clear search
+    const inp = panel.querySelector('.cb-search');
+    if(inp){ inp.value=''; searchCb(key,''); }
+  }
+}
+function closePanel(key){
+  document.getElementById('panel'+cap(key)).classList.remove('open');
+  document.getElementById('trig'+cap(key)).classList.remove('open');
+}
+
+function buildItem(key, value, label, count){
+  const div = document.createElement('div');
+  div.className = 'cb-item' + (SEL[key].has(value)?' checked':'');
+  div.dataset.value = value;
+  div.innerHTML = `
+    <div class="cb-box"><span class="cb-check-icon">✓</span></div>
+    <span style="flex:1">${label}</span>
+    <span class="cb-item-count">${count}</span>`;
+  div.addEventListener('click', ()=>{ toggleItem(key, value, div); });
+  return div;
+}
+
+function toggleItem(key, value, el){
+  if(SEL[key].has(value)){ SEL[key].delete(value); el.classList.remove('checked'); }
+  else                    { SEL[key].add(value);    el.classList.add('checked'); }
+  updateTrigger(key);
+  applyFilters();
+}
+
+function updateTrigger(key){
+  const count = SEL[key].size;
+  const lbl   = document.getElementById('lbl'+cap(key));
+  const cnt   = document.getElementById('cnt'+cap(key));
+  const trig  = document.getElementById('trig'+cap(key));
+  const labels= { site:'Semua Site', tgl:'Semua Tanggal', batch:'Semua Batch' };
+  if(count===0){
+    lbl.textContent = labels[key];
+    cnt.classList.remove('show');
+  } else if(count===1){
+    lbl.textContent = [...SEL[key]][0];
+    cnt.classList.remove('show');
+  } else {
+    lbl.textContent = [...SEL[key]].slice(0,2).join(', ')+(count>2?'…':'');
+    cnt.textContent = count;
+    cnt.classList.add('show');
+  }
+}
+
+function selectAll(key){
+  Object.keys(META[key]).forEach(v=>SEL[key].add(v));
+  renderList(key, '');
+  updateTrigger(key);
+  applyFilters();
+}
+function clearAll(key){
+  SEL[key].clear();
+  renderList(key, '');
+  updateTrigger(key);
+  applyFilters();
+}
+
+function searchCb(key, q){
+  renderList(key, q.toLowerCase());
+}
+
+function renderList(key, query=''){
+  const list = document.getElementById('list'+cap(key));
+  list.innerHTML='';
+  Object.entries(META[key])
+    .filter(([v])=>v.toLowerCase().includes(query))
+    .forEach(([v,{count}])=>{
+      list.appendChild(buildItem(key, v, v, count));
+    });
+}
+
+function populateFilters(){
+  const orderMonths = {Mei:5,Jun:6,Jul:7,Agu:8,Sep:9};
+  const sites   = [...new Set(DATA.map(r=>r.site))].sort();
+  const tgls    = [...new Set(DATA.map(r=>r.tgl))].sort((a,b)=>{
+    const [da,ma]=a.split(' '); const [db,mb]=b.split(' ');
+    return (orderMonths[ma]||0)*100+parseInt(da) - ((orderMonths[mb]||0)*100+parseInt(db));
+  });
+  const batches = [...new Set(DATA.map(r=>r.batch).filter(Boolean))].sort();
+
+  // Count occurrences per value
+  sites.forEach(s=>{   META.site[s]  = { count: DATA.filter(r=>r.site===s).length }; });
+  tgls.forEach(t=>{    META.tgl[t]   = { count: DATA.filter(r=>r.tgl===t).length }; });
+  batches.forEach(b=>{ META.batch[b] = { count: DATA.filter(r=>r.batch===b).length }; });
+
+  renderList('site');
+  renderList('tgl');
+  renderList('batch');
+}
+
+// ─── FILTER LOGIC ────────────────────────────────────────────────────────────
+let filtered = [...DATA];
+
+function applyFilters(){
+  filtered = DATA.filter(r=>{
+    if(SEL.site.size  && !SEL.site.has(r.site))   return false;
+    if(SEL.tgl.size   && !SEL.tgl.has(r.tgl))     return false;
+    if(SEL.batch.size && !SEL.batch.has(r.batch))  return false;
+    return true;
+  });
+
+  // Build chips
+  const chips=[];
+  if(SEL.site.size)  chips.push({key:'site',  label:`Site (${SEL.site.size})`});
+  if(SEL.tgl.size)   chips.push({key:'tgl',   label:`Tanggal (${SEL.tgl.size})`});
+  if(SEL.batch.size) chips.push({key:'batch', label:`Batch (${SEL.batch.size})`});
+
+  const el = document.getElementById('filterChips');
+  if(chips.length){
+    el.style.display='flex';
+    el.innerHTML = chips.map(c=>`<span class="chip">${c.label}<span class="chip-x" onclick="clearAll('${c.key}')">×</span></span>`).join('');
+    // Also show per-value chips when count is small
+    let extra='';
+    ['site','tgl','batch'].forEach(k=>{
+      if(SEL[k].size>0&&SEL[k].size<=3){
+        [...SEL[k]].forEach(v=>{ extra+=`<span class="chip" style="background:rgba(0,229,160,0.08);color:var(--green);border-color:rgba(0,229,160,0.2)">${v}<span class="chip-x" onclick="removeSingle('${k}','${v}')">×</span></span>`; });
+      }
+    });
+    if(extra) el.innerHTML += extra;
+  } else {
+    el.style.display='none';
+  }
+
+  const total = chips.length>0?`${filtered.length} order · ${chips.length} filter aktif`:`Semua data · ${filtered.length} order`;
+  document.getElementById('filterInfo').textContent = total;
+  renderAll();
+}
+
+function removeSingle(key, value){
+  SEL[key].delete(value);
+  renderList(key,'');
+  updateTrigger(key);
+  applyFilters();
+}
+
+function resetFilters(){
+  ['site','tgl','batch'].forEach(k=>{ SEL[k].clear(); renderList(k,''); updateTrigger(k); });
+  applyFilters();
+}
+
+// ─── CHART COLOUR PALETTE ────────────────────────────────────────────────────
+const COLORS = ['#3b9eff','#00e5a0','#ffb23f','#ff5757','#b97fff','#00d4ff','#ff9a3c','#7fff72'];
+
+// ─── MAIN RENDER ─────────────────────────────────────────────────────────────
+function renderAll(){
+  const d = filtered;
+  if(!d.length){
+    document.getElementById('mainContent').innerHTML = `
+      <div class="empty"><big>🔍</big>Tidak ada data sesuai filter yang dipilih.<br>
+      <button class="btn-reset" style="margin-top:16px" onclick="resetFilters()">Reset Filter</button></div>`;
+    return;
+  }
+
+  const total   = d.length;
+  const datang  = d.filter(r=>r.ked==='SUDAH DATANG').length;
+  const belum   = d.filter(r=>r.ked==='BELUM DATANG').length;
+  const otfHit  = d.filter(r=>r.otf==='HIT').length;
+  const otaHit  = d.filter(r=>r.ota==='HIT').length;
+  const pctFill = Math.round(datang/total*100);
+  const pctOTA  = total ? Math.round(otaHit/total*100) : 0;
+  const pctOTF  = total ? Math.round(otfHit/total*100) : 0;
+
+  document.getElementById('mainContent').innerHTML = `
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-accent" style="background:linear-gradient(90deg,#3b9eff,transparent)"></div>
+      <div class="kpi-label">Total Order</div>
+      <div class="kpi-value" style="color:#3b9eff">${total.toLocaleString('id')}</div>
+      <div class="kpi-sub">semua status</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-accent" style="background:linear-gradient(90deg,#00e5a0,transparent)"></div>
+      <div class="kpi-label">Sudah Datang</div>
+      <div class="kpi-value" style="color:#00e5a0">${datang}</div>
+      <div class="kpi-sub">${pctFill}% dari total</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-accent" style="background:linear-gradient(90deg,#ff5757,transparent)"></div>
+      <div class="kpi-label">Belum Datang</div>
+      <div class="kpi-value" style="color:#ff5757">${belum}</div>
+      <div class="kpi-sub">${100-pctFill}% dari total</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-accent" style="background:linear-gradient(90deg,#b97fff,transparent)"></div>
+      <div class="kpi-label">OTA Rate</div>
+      <div class="kpi-value" style="color:#b97fff">${pctOTA}%</div>
+      <div class="kpi-sub">${otaHit}/${total} hit</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-accent" style="background:linear-gradient(90deg,#ffb23f,transparent)"></div>
+      <div class="kpi-label">OTF Rate</div>
+      <div class="kpi-value" style="color:#ffb23f">${pctOTF}%</div>
+      <div class="kpi-sub">${otfHit}/${total} hit</div>
+    </div>
+  </div>
+
+  <div class="sec">01 — <span>Order Status per Site</span></div>
+  <div class="g2">
+    <div class="card"><div class="card-title">Order Datang vs Belum Datang</div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-sq" style="background:#00e5a0"></span>Sudah Datang</span>
+        <span class="legend-item"><span class="legend-sq" style="background:#ff5757"></span>Belum Datang</span>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="cSite"></canvas></div>
+    </div>
+    <div class="card"><div class="card-title">Fulfillment Rate per Site</div><div id="siteProgress"></div></div>
+  </div>
+
+  <div class="sec">02 — <span>SLA: OTF &amp; OTA by Batch</span></div>
+  <div class="g2">
+    <div class="card"><div class="card-title">OTF vs OTA per Slot Checkin</div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-sq" style="background:#3b9eff"></span>OTF</span>
+        <span class="legend-item"><span class="legend-sq" style="background:#00e5a0"></span>OTA</span>
+        <span class="legend-item"><span class="legend-sq" style="background:#ff5757"></span>Miss</span>
+      </div>
+      <div class="chart-wrap" style="height:190px"><canvas id="cSla"></canvas></div>
+    </div>
+    <div class="card"><div class="card-title">Detail SLA per Slot</div>
+      <table id="tSla"><thead><tr><th>Slot</th><th>Total</th><th>OTF</th><th>OTA</th><th>Rate</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="sec">03 — <span>Planner Create Order</span></div>
+  <div class="g2">
+    <div class="card"><div class="card-title">H-Day Distribution (dari tgl stuffing)</div>
+      <div class="chart-wrap" style="height:190px"><canvas id="cHday"></canvas></div>
+    </div>
+    <div class="card"><div class="card-title">Waktu Create Order</div>
+      <div style="display:flex;align-items:center;gap:14px;height:190px">
+        <div style="flex:0 0 130px"><canvas id="cJam" style="height:130px"></canvas></div>
+        <div id="jamStats" style="flex:1;line-height:1.8"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">04 — <span>Aging Keterlambatan OTA</span></div>
+  <div class="g2">
+    <div class="card"><div class="card-title">Distribusi Aging</div>
+      <div class="chart-wrap" style="height:190px"><canvas id="cAging"></canvas></div>
+    </div>
+    <div class="card"><div class="card-title">Breakdown per Kategori</div>
+      <table id="tAging"><thead><tr><th>Kategori</th><th>Qty</th><th>%</th><th>Level</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="sec">05–06 — <span>Waktu Tunggu &amp; Proses Muat per Armada</span></div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">Rata-rata Waktu per Tipe Armada (menit)</div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-sq" style="background:#3b9eff"></span>Tunggu Muat</span>
+      <span class="legend-item"><span class="legend-sq" style="background:#b97fff"></span>Proses Muat</span>
+    </div>
+    <div class="chart-wrap" style="height:200px"><canvas id="cArmada"></canvas></div>
+  </div>
+
+  <div class="sec">07 — <span>Summary Achievement</span></div>
+  <div class="g3" id="achCards"></div>
+  <div class="card">
+    <div class="card-title">Achievement OTF &amp; OTA per Site</div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-sq" style="background:#3b9eff"></span>OTF%</span>
+      <span class="legend-item"><span class="legend-sq" style="background:#00e5a0"></span>OTA%</span>
+      <span class="legend-item"><span class="legend-sq" style="background:rgba(255,87,87,0.5)"></span>Target 80%</span>
+    </div>
+    <div class="chart-wrap" style="height:200px"><canvas id="cAchieve"></canvas></div>
+  </div>
+  `;
+
+  // ── 1. ORDER PER SITE ──────────────────────────────────────────────────────
+  const sGrp={};
+  d.forEach(r=>{ if(!sGrp[r.site])sGrp[r.site]={dat:0,bel:0}; r.ked==='SUDAH DATANG'?sGrp[r.site].dat++:sGrp[r.site].bel++; });
+  const sKeys = Object.keys(sGrp);
+  const sLabels = sKeys.map(s=>s.replace(' JABABEKA','').replace(' SIDOARJO','\nSdj').replace('HCI ','').replace('AHI ','A.').replace('IND ','I.').replace('CIKANDE','CKD'));
+  const bw = sKeys.length===1?60:sKeys.length<4?28:18;
+  killChart('cSite');
+  CH['cSite']=new Chart(document.getElementById('cSite'),{
+    type:'bar',
+    data:{labels:sLabels,datasets:[
+      {label:'Datang',data:sKeys.map(k=>sGrp[k].dat),backgroundColor:'#00e5a0',borderRadius:4,barThickness:bw},
+      {label:'Belum', data:sKeys.map(k=>sGrp[k].bel),backgroundColor:'#ff5757',borderRadius:4,barThickness:bw}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{stacked:true,ticks:{color:'#3d4f64',maxRotation:0}},y:{stacked:true,ticks:{color:'#3d4f64'},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+  // progress bars
+  document.getElementById('siteProgress').innerHTML = sKeys.map(k=>{
+    const tot=sGrp[k].dat+sGrp[k].bel;
+    const pct=Math.round(sGrp[k].dat/tot*100);
+    const c=pct>=80?'#00e5a0':pct>=60?'#ffb23f':'#ff5757';
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:3px">
+        <span>${k.replace(' JABABEKA','').replace(' SIDOARJO',' Sdj')}</span>
+        <span style="font-family:'DM Mono';color:var(--text3)">${sGrp[k].dat}/${tot} · ${pct}%</span>
+      </div>
+      <div class="prog-wrap"><div class="prog-bar" style="width:${pct}%;background:${c}"></div></div>
+    </div>`;
+  }).join('');
+
+  // ── 2. SLA BY SLOT ─────────────────────────────────────────────────────────
+  const SLOTS=['00:00 - 06:00','06:00 - 09:00','09:00 - 12:00','12:00 - 15:00','15:00 - 18:00','18:00 - 21:00','21:00 - 00:00'];
+  const slotD=SLOTS.map(s=>{
+    const rows=d.filter(r=>r.batch===s);
+    return{s:s.replace(':00','')+'-'+s.slice(8,13).replace(':00',''),total:rows.length,otf:rows.filter(r=>r.otf==='HIT').length,ota:rows.filter(r=>r.ota==='HIT').length};
+  }).filter(s=>s.total>0);
+  killChart('cSla');
+  CH['cSla']=new Chart(document.getElementById('cSla'),{
+    type:'bar',
+    data:{labels:slotD.map(s=>s.s),datasets:[
+      {label:'OTF', data:slotD.map(s=>s.otf),backgroundColor:'#3b9eff',borderRadius:3,barThickness:16},
+      {label:'OTA', data:slotD.map(s=>s.ota),backgroundColor:'#00e5a0',borderRadius:3,barThickness:16},
+      {label:'Miss',data:slotD.map(s=>s.total-s.ota),backgroundColor:'#ff5757',borderRadius:3,barThickness:16}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#3d4f64'}},y:{ticks:{color:'#3d4f64'},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+  document.querySelector('#tSla tbody').innerHTML=slotD.map(s=>{
+    const pct=s.total?Math.round(s.ota/s.total*100):0;
+    const cls=pct>=80?'pill-green':pct>=60?'pill-amber':'pill-red';
+    return`<tr><td>${s.s}</td><td>${s.total}</td><td>${s.otf}</td><td>${s.ota}</td><td><span class="pill ${cls}">${pct}%</span></td></tr>`;
+  }).join('');
+
+  // ── 3. H-DAY & JAM ─────────────────────────────────────────────────────────
+  const hd={};
+  d.forEach(r=>{
+    const day=parseInt(r.lc.substring(4,6));
+    const h=25-day;
+    const key=h===0?'H0':h===1?'H-1':h===2?'H-2':h===3?'H-3':'H-4+';
+    hd[key]=(hd[key]||0)+1;
+  });
+  const hKeys=['H0','H-1','H-2','H-3','H-4+'].filter(k=>hd[k]>0);
+  killChart('cHday');
+  CH['cHday']=new Chart(document.getElementById('cHday'),{
+    type:'bar',
+    data:{labels:hKeys,datasets:[{data:hKeys.map(k=>hd[k]||0),backgroundColor:COLORS,borderRadius:6,barThickness:36}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#7b8fa8',font:{size:11}}},y:{ticks:{color:'#3d4f64'},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+  const pagi=d.filter(r=>r.jam!==null&&r.jam<12).length;
+  const siang=d.filter(r=>r.jam!==null&&r.jam>=12).length;
+  const noJam=d.filter(r=>r.jam===null).length;
+  killChart('cJam');
+  CH['cJam']=new Chart(document.getElementById('cJam'),{
+    type:'doughnut',
+    data:{labels:['< 12:00','≥ 12:00'],datasets:[{data:[pagi,siang],backgroundColor:['#3b9eff','#ffb23f'],borderWidth:0,hoverOffset:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}
+  });
+  document.getElementById('jamStats').innerHTML=`
+    <div><div style="font-size:9px;color:var(--text3)">Dibawah jam 12</div>
+      <div style="font-size:22px;font-weight:600;color:#3b9eff;font-family:'DM Mono'">${pagi}</div>
+      <div style="font-size:9px;color:var(--text3);margin-bottom:8px">order</div></div>
+    <div><div style="font-size:9px;color:var(--text3)">Diatas jam 12</div>
+      <div style="font-size:22px;font-weight:600;color:#ffb23f;font-family:'DM Mono'">${siang}</div>
+      <div style="font-size:9px;color:var(--text3);margin-bottom:8px">order</div></div>
+    <div><div style="font-size:9px;color:var(--text3)">Belum terjadwal</div>
+      <div style="font-size:22px;font-weight:600;color:var(--text3);font-family:'DM Mono'">${noJam}</div>
+      <div style="font-size:9px;color:var(--text3)">order</div></div>
+  `;
+
+  // ── 4. AGING ───────────────────────────────────────────────────────────────
+  const agCats=['< 1 Jam','1-4 Jam','4-8 Jam','8-13 Jam','13-24 Jam','> 24 Jam'];
+  const agV=[0,0,0,0,0,0];
+  d.forEach(r=>{
+    const ka=r.ka||'';
+    if(ka==='1-4 Jam') agV[1]++;
+    else if(ka.includes('5-8')||ka.includes('4-8')) agV[2]++;
+    else if(ka.includes('9-12')||ka.includes('8-13')) agV[3]++;
+    else if(ka==='13-24 Jam') agV[4]++;
+    else if(ka.includes('24')) agV[5]++;
+    else if(r.aging){
+      const m=r.aging;
+      if(m<60)agV[0]++;
+      else if(m<240)agV[1]++;
+      else if(m<480)agV[2]++;
+      else if(m<780)agV[3]++;
+      else if(m<1440)agV[4]++;
+      else agV[5]++;
+    }
+  });
+  const agTotal=agV.reduce((a,b)=>a+b,0);
+  const agColors=['#00e5a0','#3b9eff','#ffb23f','#ff9a3c','#ff5757','#a00000'];
+  killChart('cAging');
+  CH['cAging']=new Chart(document.getElementById('cAging'),{
+    type:'bar',
+    data:{labels:agCats,datasets:[{data:agV,backgroundColor:agColors,borderRadius:4,barThickness:18}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#3d4f64'},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#7b8fa8',font:{size:9}}}}}
+  });
+  const agLvls=['Normal','Minor','Sedang','Sedang','Kritis','Kritis'];
+  const agPills=['pill-green','pill-blue','pill-amber','pill-amber','pill-red','pill-red'];
+  document.querySelector('#tAging tbody').innerHTML=agCats.map((k,i)=>{
+    const pct=agTotal?Math.round(agV[i]/agTotal*100):0;
+    return`<tr><td>${k}</td><td>${agV[i]}</td><td>${pct}%</td><td><span class="pill ${agPills[i]}">${agLvls[i]}</span></td></tr>`;
+  }).join('');
+
+  // ── 5-6. ARMADA ────────────────────────────────────────────────────────────
+  const armGrp={};
+  d.forEach(r=>{
+    if(!armGrp[r.armada])armGrp[r.armada]={tw:[],pm:[]};
+    if(r.tunggu!==null&&r.tunggu>=0)armGrp[r.armada].tw.push(r.tunggu);
+    if(r.muat!==null&&r.muat>0)armGrp[r.armada].pm.push(r.muat);
+  });
+  const avg=arr=>arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):0;
+  const armL=Object.keys(armGrp);
+  killChart('cArmada');
+  CH['cArmada']=new Chart(document.getElementById('cArmada'),{
+    type:'bar',
+    data:{labels:armL,datasets:[
+      {label:'Tunggu',data:armL.map(k=>Math.round(avg(armGrp[k].tw)/60)),backgroundColor:'#3b9eff',borderRadius:4,barThickness:20},
+      {label:'Muat',  data:armL.map(k=>Math.round(avg(armGrp[k].pm)/60)),backgroundColor:'#b97fff',borderRadius:4,barThickness:20}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#3d4f64'}},y:{title:{display:true,text:'Menit',color:'#3d4f64',font:{size:9}},ticks:{color:'#3d4f64'},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+
+  // ── 7. ACHIEVEMENT ─────────────────────────────────────────────────────────
+  const achGap=Math.max(0,80-pctOTA);
+  document.getElementById('achCards').innerHTML=`
+    <div class="card" style="text-align:center">
+      <div class="ach-num" style="color:${pctFill>=80?'#00e5a0':'#ffb23f'}">${pctFill}<span style="font-size:20px">%</span></div>
+      <div class="ach-label">Fulfillment</div>
+      <div class="prog-wrap" style="margin-top:12px"><div class="prog-bar" style="width:${pctFill}%;background:#00e5a0"></div></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:5px;font-family:'DM Mono'">${datang}/${total}</div>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="ach-num" style="color:${pctOTA>=80?'#00e5a0':'#ff5757'}">${pctOTA}<span style="font-size:20px">%</span></div>
+      <div class="ach-label">OT Arrival</div>
+      <div class="prog-wrap" style="margin-top:12px"><div class="prog-bar" style="width:${pctOTA}%;background:${pctOTA>=80?'#00e5a0':'#ff5757'}"></div></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:5px;font-family:'DM Mono'">${otaHit}/${total}</div>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="ach-num" style="color:${achGap===0?'#00e5a0':'#ffb23f'}">${achGap}<span style="font-size:20px">%</span></div>
+      <div class="ach-label">Gap to Target</div>
+      <div style="margin-top:14px"><span class="pill ${achGap===0?'pill-green':'pill-amber'}">${achGap===0?'✓ TERCAPAI':'PERLU BOOST'}</span></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:6px">Target SLA 80%</div>
+    </div>
+  `;
+
+  killChart('cAchieve');
+  CH['cAchieve']=new Chart(document.getElementById('cAchieve'),{
+    type:'bar',
+    data:{labels:sLabels,datasets:[
+      {label:'OTF%',data:sKeys.map(k=>{const tot=sGrp[k].dat+sGrp[k].bel;const o=d.filter(r=>r.site===k&&r.otf==='HIT').length;return tot?Math.round(o/tot*100):0;}),backgroundColor:'rgba(59,158,255,0.65)',borderRadius:4,barThickness:bw},
+      {label:'OTA%',data:sKeys.map(k=>{const tot=sGrp[k].dat+sGrp[k].bel;const o=d.filter(r=>r.site===k&&r.ota==='HIT').length;return tot?Math.round(o/tot*100):0;}),backgroundColor:'rgba(0,229,160,0.65)',borderRadius:4,barThickness:bw}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#7b8fa8',font:{size:9},boxWidth:10}}},
+      scales:{x:{ticks:{color:'#3d4f64'}},y:{min:0,max:100,ticks:{callback:v=>v+'%',color:'#3d4f64'},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+// Try to load live data; fallback to static
+(async()=>{
+  try{
+    await loadData();
+  } catch(e){
+    // fallback to static data
+    DATA=[...STATIC_DATA];
+    populateFilters();
+    filtered=[...DATA];
+    document.getElementById('filterInfo').textContent=`Data lokal · ${DATA.length} order (offline)`;
+    renderAll();
+  }
+})();
+
+// Add refresh button to header
+document.querySelector('.header > div:last-child').insertAdjacentHTML('beforeend',
+  `<button class="btn-reset" style="color:var(--blue);border-color:rgba(59,158,255,0.3);background:rgba(59,158,255,0.08);height:32px;font-size:10px" onclick="loadData()">🔄 Refresh Data</button>`
+);
+</script>
+</body>
+</html>
